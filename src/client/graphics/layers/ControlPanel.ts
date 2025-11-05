@@ -24,6 +24,12 @@ export class ControlPanel extends LitElement implements Layer {
   private _maxTroops: number;
 
   @state()
+  private _territoryCapacity: number = 0;
+
+  @state()
+  private _cityCapacity: number = 0;
+
+  @state()
   private troopRate: number;
 
   @state()
@@ -85,10 +91,27 @@ export class ControlPanel extends LitElement implements Layer {
       this.updateTroopIncrease();
     }
 
-    this._maxTroops = this.game.config().maxTroops(player);
     this._gold = player.gold();
     this._troops = player.troops();
     this.troopRate = this.game.config().troopIncreaseRate(player) * 10;
+
+    // Compute breakdown of max troops into territory and city contributions
+    // Uses config methods to ensure consistency with maxTroops calculation
+    try {
+      const config = this.game.config();
+      this._territoryCapacity = Math.round(
+        config.baseTerritoryCapacity(player),
+      );
+      this._cityCapacity = Math.round(config.baseCityCapacity(player));
+      this._maxTroops = config.maxTroops(player);
+    } catch (e) {
+      // Fallback: clear breakdown if anything unexpected
+      console.warn("Failed to calculate capacity breakdown:", e);
+      this._territoryCapacity = 0;
+      this._cityCapacity = 0;
+      this._maxTroops = 0;
+    }
+
     this.requestUpdate();
   }
 
@@ -180,6 +203,45 @@ export class ControlPanel extends LitElement implements Layer {
                 >(+${renderTroops(this.troopRate)})</span
               ></span
             >
+          </div>
+          <!-- Max troops breakdown bar -->
+          <div
+            role="progressbar"
+            aria-valuenow="${this._troops}"
+            aria-valuemin="0"
+            aria-valuemax="${this._maxTroops}"
+            aria-label="Troop capacity: ${this._troops} / ${this._maxTroops}"
+            class="h-1 bg-black/50 rounded-full overflow-hidden mt-2 mb-3"
+            title="Territory: ${renderNumber(
+              this._territoryCapacity,
+            )} | Cities: ${renderNumber(this._cityCapacity)}"
+          >
+            <div
+              class="flex h-full"
+              style="width: ${this._maxTroops > 0
+                ? (this._troops / this._maxTroops) * 100
+                : 0}%"
+            >
+              <div
+                class="h-full"
+                style="background-color: ${this.game
+                  ?.myPlayer()
+                  ?.territoryColor()
+                  .toRgbString() ?? "rgb(147, 51, 234)"}; flex-grow: ${this
+                  ._territoryCapacity}"
+              ></div>
+              ${this._cityCapacity > 0
+                ? html`<div
+                    class="h-full"
+                    style="background-color: ${this.game
+                      ?.myPlayer()
+                      ?.territoryColor()
+                      .darken(0.2)
+                      .toRgbString() ?? "rgb(59, 130, 246)"}; flex-grow: ${this
+                      ._cityCapacity}"
+                  ></div>`
+                : ""}
+            </div>
           </div>
           <div class="flex justify-between">
             <span class="font-bold"
